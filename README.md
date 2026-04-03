@@ -275,7 +275,9 @@ The DB password didn't work for `su scamsite`, but SSH did with the Subrion pass
 
 ```bash
 ssh scamsite@10.64.155.75
-# Password: Scam2021
+# Password: Scam2021"This is wrong passwrod"
+# Think like hacker 
+# Hint : "use all password you gathered"
 ```
 
 **Result:** SSH login successful as `scamsite` ✅
